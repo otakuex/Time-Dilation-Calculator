@@ -583,7 +583,7 @@ function renderForm(errors = null, formData = {}, results = null) {
     </label>
     <label class="mode-option">
     <input type="radio" name="journeyMode" value="halfAcceleration" ${journeyMode === 'halfAcceleration' ? 'checked' : ''}>
-    Accelerate halfway, then decelerate halfway
+    Accelerate to halfway point, then decelerate to destination
     </label>
     </fieldset>
 
@@ -678,7 +678,7 @@ function renderResults(results) {
     <h2>Results</h2>
     <div id="results-text">
     <p><strong>Total Distance:</strong> ${formatNumber(results.totalDistanceLy, 4)} light-years</p>
-    <p><strong>Journey Profile:</strong> ${results.mode === 'halfAcceleration' ? 'Accelerate halfway, decelerate halfway' : 'Accelerate, cruise, decelerate'}</p>
+    <p><strong>Journey Profile:</strong> ${results.mode === 'halfAcceleration' ? 'Accelerate to halfway point, then decelerate to destination' : 'Accelerate, cruise, decelerate'}</p>
     <p><strong>Maximum Velocity:</strong> ${formatPercent(maxVelocityPercent, 4)}% of c</p>
     <p><strong>Required Gravity Drive Output:</strong> ${accelerationText}</p>
     <p><strong>Total Observer Time:</strong> ${yearsToYearsDays(results.observerTotalTime)} (${formatNumber(results.observerTotalTime, 4)} years)</p>
