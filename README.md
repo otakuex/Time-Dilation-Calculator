@@ -40,7 +40,7 @@ If both commands show version numbers, you are ready to continue.
 
 If either command is missing, install Node.js. npm is included with Node.js.
 
-Install on Linux or macOS using nvm
+### Install on Linux or macOS using nvm
 
 The npm documentation recommends using a Node version manager such as nvm instead of manually installing Node.js.
 
