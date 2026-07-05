@@ -1,7 +1,5 @@
 # Time-Dilation-Calculator
 
-# Gravity Drive Calculator
-
 A small Node.js / Express web app for calculating relativistic travel times with reasonable precision for sci-fi storytelling purposes.
 
 The app estimates the difference between time experienced by a stationary observer and time experienced by travelers aboard a ship moving at relativistic speeds. It is designed for practical story planning rather than ultra-high-precision physics research.
