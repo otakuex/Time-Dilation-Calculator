@@ -69,7 +69,7 @@ Then open this address in your browser:
 http://localhost:3001
 ```
 
-If Chrome has trouble with `localhost`, try:
+If your browser has trouble with `localhost`, try:
 
 ```text
 http://127.0.0.1:3001
