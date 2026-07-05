@@ -556,7 +556,7 @@ function renderForm(errors = null, formData = {}, results = null) {
     <legend>Halfway Acceleration Mode</legend>
     <div class="input-group">
     <label for="acceleration">Gravity Drive Output (g):</label>
-    <input type="number" name="acceleration" id="acceleration" min="0.0001" step="any" value="${escapeHtml(acceleration)}">
+    <input type="number" name="acceleration" id="acceleration" min="0.01" step="0.01" value="${escapeHtml(acceleration)}">
     </div>
     <p class="small">Uses real Earth gravity conversion: 1g ≈ ${formatNumber(LY_PER_YEAR2_PER_G, 6)} ly/yr².</p>
     </fieldset>
