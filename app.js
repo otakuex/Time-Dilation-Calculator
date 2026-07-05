@@ -27,6 +27,38 @@ function parseNonNegativeNumber(value) {
     return Number.isFinite(number) && number >= 0 ? number : null;
 }
 
+function parseOptionalSpeedLimitPercent(value) {
+    if (value === undefined || value === null || String(value).trim() === '') {
+        return {
+            value: null,
+            error: null,
+        };
+    }
+
+    const text = String(value).trim();
+
+    if (!/^\d+(\.\d{1,2})?$/.test(text)) {
+        return {
+            value: null,
+            error: 'Maximum speed limit must be a number with up to two decimal places.',
+        };
+    }
+
+    const number = Number(text);
+
+    if (!Number.isFinite(number) || number <= 0 || number >= 100) {
+        return {
+            value: null,
+            error: 'Maximum speed limit must be greater than 0 and less than 100.',
+        };
+    }
+
+    return {
+        value: number,
+        error: null,
+    };
+}
+
 function clamp(value, min, max) {
     return Math.min(Math.max(value, min), max);
 }
@@ -63,38 +95,85 @@ function formatPercent(value, decimals = 2) {
     return Number(value.toFixed(decimals)).toString();
 }
 
-function calculateHalfAccelerationTrip(totalDistanceLy, accelerationGs) {
+function calculateHalfAccelerationTrip(totalDistanceLy, accelerationGs, speedLimitPercent = null) {
     const a = accelerationGs * LY_PER_YEAR2_PER_G;
     const halfDistance = totalDistanceLy / 2;
 
-    // Constant proper acceleration equations, using observer-frame distance.
-    // Distance during acceleration: x = (c^2 / a) * (gamma - 1)
-    // Therefore gamma = 1 + (a * x / c^2)
-    const gammaMax = 1 + (a * halfDistance) / (C * C);
-    const vMax = Math.sqrt(1 - 1 / (gammaMax * gammaMax));
-    const rapidity = Math.acosh(gammaMax);
+    // Unrestricted halfway acceleration result.
+    const unrestrictedGammaMax = 1 + (a * halfDistance) / (C * C);
+    const unrestrictedVMax = Math.sqrt(1 - 1 / (unrestrictedGammaMax * unrestrictedGammaMax));
 
-    const shipHalfTime = (C / a) * rapidity;
-    const observerHalfTime = (C / a) * Math.sinh(rapidity);
+    const hasLimiter = speedLimitPercent !== null;
+    const speedLimitFraction = hasLimiter ? speedLimitPercent / 100 : null;
 
-    const shipTotalTime = shipHalfTime * 2;
-    const observerTotalTime = observerHalfTime * 2;
+    // If no limiter is entered, or if the limiter is above the ship's natural halfway speed,
+    // use the original accelerate-halfway/decelerate-halfway behavior.
+    if (!hasLimiter || speedLimitFraction >= unrestrictedVMax) {
+        const rapidity = Math.acosh(unrestrictedGammaMax);
+
+        const shipHalfTime = (C / a) * rapidity;
+        const observerHalfTime = (C / a) * Math.sinh(rapidity);
+
+        const shipTotalTime = shipHalfTime * 2;
+        const observerTotalTime = observerHalfTime * 2;
+
+        return {
+            mode: 'halfAcceleration',
+            totalDistanceLy,
+            accelerationGs,
+            accelerationLyPerYear2: a,
+            accelerationDistanceLy: halfDistance,
+            cruiseDistanceLy: 0,
+            decelerationDistanceLy: halfDistance,
+            vMax: unrestrictedVMax,
+            speedLimitPercent,
+            speedLimitReached: false,
+            shipAccelerationTime: shipHalfTime,
+            observerAccelerationTime: observerHalfTime,
+            shipCruiseTime: 0,
+            observerCruiseTime: 0,
+            shipDecelerationTime: shipHalfTime,
+            observerDecelerationTime: observerHalfTime,
+            shipTotalTime,
+            observerTotalTime,
+        };
+    }
+
+    // Limited-speed version:
+    // Accelerate to speed limit, cruise, then decelerate to destination.
+    const gammaLimit = gammaFromVelocity(speedLimitFraction);
+    const rapidityLimit = atanh(speedLimitFraction);
+
+    const accelerationDistanceLy = (C * C / a) * (gammaLimit - 1);
+    const decelerationDistanceLy = accelerationDistanceLy;
+    const cruiseDistanceLy = Math.max(0, totalDistanceLy - accelerationDistanceLy - decelerationDistanceLy);
+
+    const observerAccelerationTime = (C / a) * Math.sinh(rapidityLimit);
+    const shipAccelerationTime = (C / a) * rapidityLimit;
+
+    const observerCruiseTime = cruiseDistanceLy / speedLimitFraction;
+    const shipCruiseTime = observerCruiseTime / gammaLimit;
+
+    const observerTotalTime = observerAccelerationTime + observerCruiseTime + observerAccelerationTime;
+    const shipTotalTime = shipAccelerationTime + shipCruiseTime + shipAccelerationTime;
 
     return {
         mode: 'halfAcceleration',
         totalDistanceLy,
         accelerationGs,
         accelerationLyPerYear2: a,
-        accelerationDistanceLy: halfDistance,
-        cruiseDistanceLy: 0,
-        decelerationDistanceLy: halfDistance,
-        vMax,
-        shipAccelerationTime: shipHalfTime,
-        observerAccelerationTime: observerHalfTime,
-        shipCruiseTime: 0,
-        observerCruiseTime: 0,
-        shipDecelerationTime: shipHalfTime,
-        observerDecelerationTime: observerHalfTime,
+        accelerationDistanceLy,
+        cruiseDistanceLy,
+        decelerationDistanceLy,
+        vMax: speedLimitFraction,
+        speedLimitPercent,
+        speedLimitReached: true,
+        shipAccelerationTime,
+        observerAccelerationTime,
+        shipCruiseTime,
+        observerCruiseTime,
+        shipDecelerationTime: shipAccelerationTime,
+        observerDecelerationTime: observerAccelerationTime,
         shipTotalTime,
         observerTotalTime,
     };
@@ -159,6 +238,8 @@ function calculateTargetVelocityCruiseTrip(totalDistanceLy, targetVelocityPercen
         decelerationDistanceLy,
         vMax,
         gammaMax,
+        speedLimitPercent: null,
+        speedLimitReached: false,
         shipAccelerationTime: accelPhase.shipTime,
         observerAccelerationTime: accelPhase.observerTime,
         shipCruiseTime,
@@ -185,22 +266,16 @@ function generateChartData(results) {
         const x = (totalDistance / numPoints) * i;
         let v = 0;
 
-        if (results.mode === 'halfAcceleration') {
-            const halfDistance = totalDistance / 2;
-            const phaseDistance = x <= halfDistance ? x : totalDistance - x;
-            const gamma = 1 + (results.accelerationLyPerYear2 * phaseDistance) / (C * C);
+        if (x <= accelDistance && accelDistance > 0) {
+            const gamma = 1 + (results.accelerationLyPerYear2 * x) / (C * C);
             v = Math.sqrt(1 - 1 / (gamma * gamma));
-        } else {
-            if (x <= accelDistance && accelDistance > 0) {
-                const gamma = 1 + (results.accelerationLyPerYear2 * x) / (C * C);
-                v = Math.sqrt(1 - 1 / (gamma * gamma));
-            } else if (x <= decelStart) {
-                v = vMax;
-            } else if (results.decelerationDistanceLy > 0) {
-                const remainingDecelDistance = totalDistance - x;
-                const gamma = 1 + (results.decelerationLyPerYear2 * remainingDecelDistance) / (C * C);
-                v = Math.sqrt(1 - 1 / (gamma * gamma));
-            }
+        } else if (x <= decelStart) {
+            v = vMax;
+        } else if (results.decelerationDistanceLy > 0) {
+            const decelAcceleration = results.decelerationLyPerYear2 || results.accelerationLyPerYear2;
+            const remainingDecelDistance = totalDistance - x;
+            const gamma = 1 + (decelAcceleration * remainingDecelDistance) / (C * C);
+            v = Math.sqrt(1 - 1 / (gamma * gamma));
         }
 
         distances.push(Number(x.toFixed(4)));
@@ -244,9 +319,14 @@ app.all('/', (req, res) => {
 
         if (journeyMode === 'halfAcceleration') {
             const accelerationGs = parsePositiveNumber(req.body.acceleration);
+            const speedLimitResult = parseOptionalSpeedLimitPercent(req.body.speedLimit);
 
             if (accelerationGs === null) {
                 errors.push('Gravity drive output is required and must be a positive number.');
+            }
+
+            if (speedLimitResult.error) {
+                errors.push(speedLimitResult.error);
             }
 
             if (errors.length > 0) {
@@ -254,7 +334,11 @@ app.all('/', (req, res) => {
                 return;
             }
 
-            rawResults = calculateHalfAccelerationTrip(totalDistanceLy, accelerationGs);
+            rawResults = calculateHalfAccelerationTrip(
+                totalDistanceLy,
+                accelerationGs,
+                speedLimitResult.value
+            );
         } else if (journeyMode === 'targetVelocityCruise') {
             const targetVelocityPercent = parsePositiveNumber(req.body.targetVelocity);
             const accelerationDistanceLy = parseNonNegativeNumber(req.body.accelerationDistance);
@@ -311,6 +395,7 @@ function buildFormDataFromResults(results) {
         journeyMode: results.mode,
         distance: results.totalDistanceLy,
         acceleration: results.accelerationGs ?? '',
+        speedLimit: results.speedLimitPercent ?? '',
         targetVelocity: results.vMax * 100,
         accelerationDistance: results.accelerationDistanceLy,
         decelerationDistance: results.decelerationDistanceLy,
@@ -325,6 +410,7 @@ function renderForm(errors = null, formData = {}, results = null) {
         journeyMode = 'targetVelocityCruise',
         distance = '20',
         acceleration = '1',
+        speedLimit = '',
         targetVelocity = '99',
         accelerationDistance = '1',
         decelerationDistance = '1',
@@ -618,7 +704,11 @@ function renderForm(errors = null, formData = {}, results = null) {
     <label for="acceleration">Gravity Drive Output (g):</label>
     <input type="number" name="acceleration" id="acceleration" min="0.01" step="0.01" value="${escapeHtml(acceleration)}">
     </div>
-    <p class="small">Uses real Earth gravity conversion: 1g ≈ ${formatNumber(LY_PER_YEAR2_PER_G, 6)} ly/yr².</p>
+    <div class="input-group">
+    <label for="speedLimit">Maximum Speed Limit (% of c, optional):</label>
+    <input type="number" name="speedLimit" id="speedLimit" min="0.01" max="99.99" step="0.01" value="${escapeHtml(speedLimit)}" placeholder="No limit">
+    </div>
+    <p class="small">Leave blank for no speed limit. If entered, the ship accelerates to this speed, cruises, then decelerates. Uses real Earth gravity conversion: 1g ≈ ${formatNumber(LY_PER_YEAR2_PER_G, 6)} ly/yr².</p>
     </fieldset>
 
     <button type="submit">Calculate</button>
@@ -668,6 +758,10 @@ function renderResults(results) {
     ? `${formatNumber(results.accelerationGs, 4)} g`
     : `${formatNumber(results.accelerationGs, 4)} g acceleration / ${formatNumber(results.decelerationGs, 4)} g deceleration`;
 
+    const speedLimitLine = results.mode === 'halfAcceleration' && results.speedLimitPercent !== null
+    ? `<p><strong>Maximum Speed Limit:</strong> ${formatPercent(results.speedLimitPercent, 2)}% of c ${results.speedLimitReached ? '(reached; cruise phase added)' : '(not reached before halfway point)'}</p>`
+    : '';
+
     const cruiseLine = results.cruiseDistanceLy > 0
     ? `<tr><td>Cruise</td><td>${formatNumber(results.cruiseDistanceLy, 4)} ly</td><td>${yearsToYearsDays(results.observerCruiseTime)}</td><td>${yearsToYearsDays(results.shipCruiseTime)}</td></tr>`
     : '';
@@ -680,6 +774,7 @@ function renderResults(results) {
     <p><strong>Total Distance:</strong> ${formatNumber(results.totalDistanceLy, 4)} light-years</p>
     <p><strong>Journey Profile:</strong> ${results.mode === 'halfAcceleration' ? 'Accelerate to halfway point, then decelerate to destination' : 'Accelerate, cruise, decelerate'}</p>
     <p><strong>Maximum Velocity:</strong> ${formatPercent(maxVelocityPercent, 4)}% of c</p>
+    ${speedLimitLine}
     <p><strong>Required Gravity Drive Output:</strong> ${accelerationText}</p>
     <p><strong>Total Observer Time:</strong> ${yearsToYearsDays(results.observerTotalTime)} (${formatNumber(results.observerTotalTime, 4)} years)</p>
     <p><strong>Total Ship Time:</strong> ${yearsToYearsDays(results.shipTotalTime)} (${formatNumber(results.shipTotalTime, 4)} years)</p>
