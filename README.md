@@ -43,8 +43,8 @@ If both commands show version numbers, you are ready to continue.
 Clone the repository:
 
 ```bash
-git clone <your-repository-url>
-cd <your-repository-folder>
+git clone [<your-repository-url>](https://github.com/otakuex/Time-Dilation-Calculator.git)
+cd Time-Dilation-Calculator
 ```
 
 Install dependencies:
