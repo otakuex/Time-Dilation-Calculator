@@ -1,60 +1,84 @@
 # Time-Dilation-Calculator
 
-A small Node.js / Express web app for calculating relativistic travel times with reasonable precision for sci-fi storytelling purposes.
+A small Node.js / Express web app for calculating relativistic travel times with reasonable precision for sci-fi storytelling and worldbuilding.
 
-The app estimates the difference between time experienced by a stationary observer and time experienced by travelers aboard a ship moving at relativistic speeds. It is designed for practical story planning rather than ultra-high-precision physics research.
+The app estimates the difference between:
+
+- Time experienced by a stationary observer
+- Time experienced by travelers aboard a ship moving at relativistic speeds
+
+It is designed for practical story planning rather than ultra-high-precision physics research.
 
 ## Features
 
-* Calculates travel time using observer-frame distances.
-* Does not apply length contraction to the route distance.
-* Supports two journey profiles:
-
-  * Accelerate to target velocity, cruise, then decelerate.
-  * Accelerate halfway, then decelerate halfway.
-* Shows:
-
-  * Total observer time.
-  * Total ship time.
-  * Time difference caused by relativistic time dilation.
-  * Maximum velocity.
-  * Required gravity drive output.
-  * Phase breakdown for acceleration, cruise, deceleration, and total trip.
-* Displays a velocity chart across the trip distance.
-* Formats time in years and days for story-friendly use.
+- Calculates travel time using observer-frame distances.
+- Does not apply length contraction to the route distance.
+- Supports two journey profiles:
+  - Accelerate to target velocity, cruise, then decelerate.
+  - Accelerate halfway, then decelerate halfway.
+- Shows:
+  - Total observer time
+  - Total ship time
+  - Time difference caused by relativistic time dilation
+  - Maximum velocity
+  - Required gravity drive output
+  - Phase breakdown for acceleration, cruise, deceleration, and total trip
+- Displays a velocity chart across the trip distance.
+- Includes zoom controls for the velocity chart.
+- Formats time in years and days for story-friendly use.
 
 ## Requirements
 
 You need Node.js and npm installed.
 
-Check whether they are installed:
+Check whether they are already installed:
 
 ```bash
 node -v
 npm -v
 ```
 
-If both commands show version numbers, you are ready to continue.
+If both commands show version numbers, continue to [Installation](#installation).
 
-If either command is missing, install Node.js. npm is included with Node.js.
+If either command is missing, install Node.js and npm using one of the options below.
 
-### Install on Linux or macOS using nvm
+## Installing Node.js and npm
 
-The npm documentation recommends using a Node version manager such as nvm instead of manually installing Node.js.
+### Option 1: Linux using apt
 
-Install nvm:
+On Ubuntu, Linux Mint, Debian, or similar distributions, install Node.js and npm with:
+
+```bash
+sudo apt update
+sudo apt install nodejs npm
+```
+
+Verify the installation:
+
+```bash
+node -v
+npm -v
+```
+
+This is the simplest option and is usually good enough for running this app.
+
+### Option 2: Linux or macOS using nvm
+
+`nvm` is a Node.js version manager. It is useful if you want a newer Node.js version or want to switch between multiple Node.js versions.
+
+Install `nvm`:
 
 ```bash
 curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.5/install.sh | bash
 ```
 
-Load nvm into the current terminal session:
+Load `nvm` into the current terminal session:
 
 ```bash
 . "$HOME/.nvm/nvm.sh"
 ```
 
-Install Node.js LTS:
+Install the latest long-term-support version of Node.js:
 
 ```bash
 nvm install --lts
@@ -67,28 +91,26 @@ node -v
 npm -v
 ```
 
-### Install on Windows
+### Option 3: Windows
 
-On Windows, use the official Node.js installer or a Windows-compatible version manager.
+Download and install the LTS version of Node.js from the official Node.js website.
 
-Download Node.js from the official Node.js download page and install the LTS version. npm will be installed automatically with Node.js.
+npm is included with Node.js.
 
 After installation, open PowerShell or Command Prompt and verify:
 
-```bash
+```powershell
 node -v
 npm -v
 ```
 
-### Install on macOS using Homebrew
+### Option 4: macOS using Homebrew
 
-If you already use Homebrew, you can install Node.js with:
+If you already use Homebrew, install Node.js with:
 
 ```bash
 brew install node
 ```
-
-Homebrew’s Node package includes npm.
 
 Verify:
 
@@ -102,7 +124,7 @@ npm -v
 Clone the repository:
 
 ```bash
-git clone [<your-repository-url>](https://github.com/otakuex/Time-Dilation-Calculator.git)
+git clone https://github.com/otakuex/Time-Dilation-Calculator.git
 cd Time-Dilation-Calculator
 ```
 
@@ -112,7 +134,7 @@ Install dependencies:
 npm install
 ```
 
-This will recreate the `node_modules` directory locally.
+This installs the required packages listed in `package.json`, including Express. It will also recreate the `node_modules` directory locally.
 
 ## Running the App
 
@@ -140,9 +162,9 @@ To stop the app, press:
 Ctrl+C
 ```
 
-## Optional: Add an npm Start Command
+## Optional: npm Start Command
 
-If `package.json` does not already include a start script, add this inside the `"scripts"` section:
+If `package.json` includes this script:
 
 ```json
 "scripts": {
@@ -150,23 +172,33 @@ If `package.json` does not already include a start script, add this inside the `
 }
 ```
 
-Then you can run the app with:
+then you can run the app with:
 
 ```bash
 npm start
 ```
 
-## Notes on Accuracy
+## Project Files
 
-This calculator is intended for science-fiction writing and worldbuilding. It aims to produce reasonable, internally consistent relativistic travel estimates, rounded to years and days.
+The main project files are:
 
-It uses stationary-observer distances. For example, a 10-light-year trip is treated as 10 light-years from the stationary observer’s frame of reference.
+```text
+app.js
+package.json
+package-lock.json
+README.md
+.gitignore
+```
 
-Length contraction is not applied to the entered route distance.
+Do not upload `node_modules` to GitHub. It is recreated automatically when someone runs:
 
-## Suggested `.gitignore`
+```bash
+npm install
+```
 
-Do not upload `node_modules` to GitHub. Use a `.gitignore` file like this:
+## Suggested .gitignore
+
+Use a `.gitignore` file like this:
 
 ```gitignore
 node_modules/
@@ -174,3 +206,13 @@ node_modules/
 .DS_Store
 npm-debug.log*
 ```
+
+## Notes on Accuracy
+
+This calculator is intended for science-fiction writing and worldbuilding.
+
+It aims to produce reasonable, internally consistent relativistic travel estimates. Results are rounded to years and days because that level of precision is usually more useful for writing than exact hours, minutes, or seconds.
+
+Distances are entered from the stationary observer’s frame of reference. For example, a 10-light-year trip is treated as 10 light-years from the stationary observer’s perspective.
+
+Length contraction is not applied to the entered route distance.
