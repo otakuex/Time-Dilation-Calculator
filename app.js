@@ -519,11 +519,11 @@ function renderForm(errors = null, formData = {}, results = null) {
     <legend>Journey Profile</legend>
     <label class="mode-option">
     <input type="radio" name="journeyMode" value="targetVelocityCruise" ${journeyMode === 'targetVelocityCruise' ? 'checked' : ''}>
-    Accelerate to target speed, cruise, then decelerate
+    Accelerate to target speed, cruise, then decelerate to destination
     </label>
     <label class="mode-option">
     <input type="radio" name="journeyMode" value="halfAcceleration" ${journeyMode === 'halfAcceleration' ? 'checked' : ''}>
-    Accelerate halfway, then decelerate halfway
+    Accelerate to halfway point, then decelerate to destination
     </label>
     </fieldset>
 
