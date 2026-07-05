@@ -122,6 +122,7 @@ function calculateHalfAccelerationTrip(totalDistanceLy, accelerationGs, speedLim
             totalDistanceLy,
             accelerationGs,
             accelerationLyPerYear2: a,
+            decelerationLyPerYear2: a,
             accelerationDistanceLy: halfDistance,
             cruiseDistanceLy: 0,
             decelerationDistanceLy: halfDistance,
@@ -162,6 +163,7 @@ function calculateHalfAccelerationTrip(totalDistanceLy, accelerationGs, speedLim
         totalDistanceLy,
         accelerationGs,
         accelerationLyPerYear2: a,
+        decelerationLyPerYear2: a,
         accelerationDistanceLy,
         cruiseDistanceLy,
         decelerationDistanceLy,
@@ -724,10 +726,24 @@ function renderForm(errors = null, formData = {}, results = null) {
         const halfAccelerationFields = document.getElementById('halfAccelerationFields');
         const copyButton = document.getElementById('copy-button');
 
+        function setFieldsetInputsDisabled(fieldset, disabled) {
+            const inputs = fieldset.querySelectorAll('input, select, textarea, button');
+            inputs.forEach((input) => {
+                input.disabled = disabled;
+            });
+        }
+
         function updateModeVisibility() {
             const selected = document.querySelector('input[name="journeyMode"]:checked').value;
-            targetVelocityFields.classList.toggle('hidden', selected !== 'targetVelocityCruise');
-            halfAccelerationFields.classList.toggle('hidden', selected !== 'halfAcceleration');
+
+            const usingTargetVelocityCruise = selected === 'targetVelocityCruise';
+            const usingHalfAcceleration = selected === 'halfAcceleration';
+
+            targetVelocityFields.classList.toggle('hidden', !usingTargetVelocityCruise);
+            halfAccelerationFields.classList.toggle('hidden', !usingHalfAcceleration);
+
+            setFieldsetInputsDisabled(targetVelocityFields, !usingTargetVelocityCruise);
+            setFieldsetInputsDisabled(halfAccelerationFields, !usingHalfAcceleration);
         }
 
         modeRadios.forEach((radio) => radio.addEventListener('change', updateModeVisibility));
