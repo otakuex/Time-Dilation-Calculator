@@ -417,8 +417,15 @@ function renderForm(errors = null, formData = {}, results = null) {
         font-size: 1em;
     }
 
-    button:hover {
+    button:hover:not(:disabled) {
         background-color: #42a5f5;
+    }
+
+    button:disabled {
+        background-color: #555;
+        color: #999;
+        cursor: not-allowed;
+        opacity: 0.7;
     }
 
     .error-box, .results-box, .note-box {
@@ -477,9 +484,62 @@ function renderForm(errors = null, formData = {}, results = null) {
     margin: 0;
     }
 
-    .results-box canvas {
-        width: 100% !important;
-        height: auto !important;
+    .chart-controls {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        gap: 0.75em;
+        margin-bottom: 1em;
+        flex-wrap: wrap;
+    }
+
+    .chart-controls button {
+        margin-top: 0;
+        padding: 0.55em 0.9em;
+    }
+
+    #zoom-level-label {
+    color: #bdbdbd;
+    min-width: 90px;
+    text-align: center;
+    font-size: 0.95em;
+    }
+
+    .chart-scroll-container {
+        width: 100%;
+        overflow-x: auto;
+        overflow-y: hidden;
+        padding-bottom: 0.5em;
+    }
+
+    .chart-scroll-container::-webkit-scrollbar {
+        height: 10px;
+    }
+
+    .chart-scroll-container::-webkit-scrollbar-track {
+        background: #1e1e1e;
+        border-radius: 5px;
+    }
+
+    .chart-scroll-container::-webkit-scrollbar-thumb {
+        background: #555;
+        border-radius: 5px;
+    }
+
+    .chart-scroll-container::-webkit-scrollbar-thumb:hover {
+        background: #777;
+    }
+
+    #chart-inner {
+    width: 100%;
+    height: 390px;
+    position: relative;
+    transition: width 0.18s ease-in-out;
+    }
+
+    #velocityChart {
+    width: 100% !important;
+    height: 390px !important;
     }
 
     .hidden {
@@ -519,11 +579,11 @@ function renderForm(errors = null, formData = {}, results = null) {
     <legend>Journey Profile</legend>
     <label class="mode-option">
     <input type="radio" name="journeyMode" value="targetVelocityCruise" ${journeyMode === 'targetVelocityCruise' ? 'checked' : ''}>
-    Accelerate to target speed, cruise, then decelerate to destination
+    Accelerate to target speed, cruise, then decelerate
     </label>
     <label class="mode-option">
     <input type="radio" name="journeyMode" value="halfAcceleration" ${journeyMode === 'halfAcceleration' ? 'checked' : ''}>
-    Accelerate to halfway point, then decelerate to destination
+    Accelerate halfway, then decelerate halfway
     </label>
     </fieldset>
 
@@ -660,7 +720,16 @@ function renderResults(results) {
     </div>
     </div>
     <div class="results-box">
+    <div class="chart-controls">
+    <button id="zoom-out-button" type="button" disabled>Zoom Out</button>
+    <span id="zoom-level-label">Zoom 0 / 5</span>
+    <button id="zoom-in-button" type="button">Zoom In</button>
+    </div>
+    <div class="chart-scroll-container" id="chart-scroll-container">
+    <div id="chart-inner">
     <canvas id="velocityChart"></canvas>
+    </div>
+    </div>
     </div>`;
 }
 
@@ -669,6 +738,26 @@ function renderChartScript(chartData) {
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script>
     const ctx = document.getElementById('velocityChart').getContext('2d');
+    const chartInner = document.getElementById('chart-inner');
+    const chartScrollContainer = document.getElementById('chart-scroll-container');
+    const zoomInButton = document.getElementById('zoom-in-button');
+    const zoomOutButton = document.getElementById('zoom-out-button');
+    const zoomLevelLabel = document.getElementById('zoom-level-label');
+
+    let zoomLevel = 0;
+    const maxZoomLevel = 5;
+    const zoomWidthMultipliers = [1, 1.75, 2.5, 3.5, 4.75, 6];
+
+    function distanceLabelDecimalsForZoom(level) {
+        if (level <= 0) return 2;
+        if (level <= 2) return 3;
+        return 4;
+    }
+
+    function maxTicksForZoom(level) {
+        return 8 + level * 5;
+    }
+
     const data = {
         labels: ${JSON.stringify(chartData.distances)},
         datasets: [{
@@ -681,10 +770,13 @@ function renderChartScript(chartData) {
         }]
     };
 
-    new Chart(ctx, {
+    const velocityChart = new Chart(ctx, {
         type: 'line',
         data,
         options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            animation: false,
             plugins: {
                 legend: {
                     labels: { color: '#e0e0e0' }
@@ -695,21 +787,24 @@ function renderChartScript(chartData) {
                     title: {
                         display: true,
                         text: 'Distance (light-years)',
-              color: '#e0e0e0'
+                                    color: '#e0e0e0'
                     },
                     ticks: {
                         color: '#e0e0e0',
-                        callback: function(value) {
-                            const num = Number(this.getLabelForValue(value));
-                            return (Math.round(num * 100) / 100).toString();
-                        }
+                        autoSkip: true,
+                        maxTicksLimit: maxTicksForZoom(zoomLevel),
+                                    callback: function(value) {
+                                        const num = Number(this.getLabelForValue(value));
+                                        const decimals = distanceLabelDecimalsForZoom(zoomLevel);
+                                        return Number(num.toFixed(decimals)).toString();
+                                    }
                     }
                 },
                 y: {
                     title: {
                         display: true,
                         text: 'Velocity (% of c)',
-              color: '#e0e0e0'
+                                    color: '#e0e0e0'
                     },
                     ticks: { color: '#e0e0e0' },
                     min: 0,
@@ -718,6 +813,50 @@ function renderChartScript(chartData) {
             }
         }
     });
+
+    function updateZoomControls() {
+        const widthPercent = zoomWidthMultipliers[zoomLevel] * 100;
+        chartInner.style.width = widthPercent + '%';
+
+        velocityChart.options.scales.x.ticks.maxTicksLimit = maxTicksForZoom(zoomLevel);
+        velocityChart.update('none');
+
+        zoomOutButton.disabled = zoomLevel === 0;
+        zoomInButton.disabled = zoomLevel === maxZoomLevel;
+        zoomLevelLabel.textContent = 'Zoom ' + zoomLevel + ' / ' + maxZoomLevel;
+
+        if (zoomLevel === 0) {
+            chartScrollContainer.scrollLeft = 0;
+        }
+    }
+
+    zoomInButton.addEventListener('click', () => {
+        if (zoomLevel >= maxZoomLevel) return;
+
+        const previousScrollRatio = chartScrollContainer.scrollLeft /
+        Math.max(1, chartScrollContainer.scrollWidth - chartScrollContainer.clientWidth);
+
+        zoomLevel += 1;
+        updateZoomControls();
+
+        const newMaxScroll = chartScrollContainer.scrollWidth - chartScrollContainer.clientWidth;
+        chartScrollContainer.scrollLeft = previousScrollRatio * newMaxScroll;
+    });
+
+    zoomOutButton.addEventListener('click', () => {
+        if (zoomLevel <= 0) return;
+
+        const previousScrollRatio = chartScrollContainer.scrollLeft /
+        Math.max(1, chartScrollContainer.scrollWidth - chartScrollContainer.clientWidth);
+
+        zoomLevel -= 1;
+        updateZoomControls();
+
+        const newMaxScroll = chartScrollContainer.scrollWidth - chartScrollContainer.clientWidth;
+        chartScrollContainer.scrollLeft = previousScrollRatio * newMaxScroll;
+    });
+
+    updateZoomControls();
     </script>`;
 }
 
