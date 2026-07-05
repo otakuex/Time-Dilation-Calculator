@@ -38,6 +38,67 @@ npm -v
 
 If both commands show version numbers, you are ready to continue.
 
+If either command is missing, install Node.js. npm is included with Node.js.
+
+Install on Linux or macOS using nvm
+
+The npm documentation recommends using a Node version manager such as nvm instead of manually installing Node.js.
+
+Install nvm:
+
+```bash
+curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.5/install.sh | bash
+```
+
+Load nvm into the current terminal session:
+
+```bash
+. "$HOME/.nvm/nvm.sh"
+```
+
+Install Node.js LTS:
+
+```bash
+nvm install --lts
+```
+
+Verify the installation:
+
+```bash
+node -v
+npm -v
+```
+
+### Install on Windows
+
+On Windows, use the official Node.js installer or a Windows-compatible version manager.
+
+Download Node.js from the official Node.js download page and install the LTS version. npm will be installed automatically with Node.js.
+
+After installation, open PowerShell or Command Prompt and verify:
+
+```bash
+node -v
+npm -v
+```
+
+### Install on macOS using Homebrew
+
+If you already use Homebrew, you can install Node.js with:
+
+```bash
+brew install node
+```
+
+Homebrew’s Node package includes npm.
+
+Verify:
+
+```bash
+node -v
+npm -v
+```
+
 ## Installation
 
 Clone the repository:
