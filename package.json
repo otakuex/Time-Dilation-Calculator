@@ -1,13 +1,17 @@
 {
-  "name": "tdc",
+  "name": "time-dilation-calculator",
   "version": "1.0.0",
-  "description": "",
+  "description": "Relativistic time dilation and travel calculator",
   "main": "app.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "start": "node app.js"
   },
-  "keywords": [],
-  "author": "",
+  "keywords": [
+    "relativity",
+    "time-dilation",
+    "calculator"
+  ],
+  "author": "OtakuEX",
   "license": "ISC",
   "dependencies": {
     "express": "^5.2.1"

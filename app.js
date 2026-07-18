@@ -15,7 +15,8 @@ const METERS_PER_LIGHT_YEAR = 9460730472580800;
 // Converts real Earth g to light-years / year^2.
 // 1g ≈ 1.0323 ly/yr^2.
 const LY_PER_YEAR2_PER_G =
-(STANDARD_GRAVITY_M_PER_S2 * SECONDS_PER_YEAR * SECONDS_PER_YEAR) / METERS_PER_LIGHT_YEAR;
+    (STANDARD_GRAVITY_M_PER_S2 * SECONDS_PER_YEAR * SECONDS_PER_YEAR) /
+    METERS_PER_LIGHT_YEAR;
 
 function parsePositiveNumber(value) {
     const number = Number(value);
@@ -28,7 +29,11 @@ function parseNonNegativeNumber(value) {
 }
 
 function parseOptionalSpeedLimitPercent(value) {
-    if (value === undefined || value === null || String(value).trim() === '') {
+    if (
+        value === undefined ||
+        value === null ||
+        String(value).trim() === ''
+    ) {
         return {
             value: null,
             error: null,
@@ -40,7 +45,8 @@ function parseOptionalSpeedLimitPercent(value) {
     if (!/^\d+(\.\d{1,2})?$/.test(text)) {
         return {
             value: null,
-            error: 'Maximum speed limit must be a number with up to two decimal places.',
+            error:
+                'Maximum speed limit must be a number with up to two decimal places.',
         };
     }
 
@@ -49,7 +55,8 @@ function parseOptionalSpeedLimitPercent(value) {
     if (!Number.isFinite(number) || number <= 0 || number >= 100) {
         return {
             value: null,
-            error: 'Maximum speed limit must be greater than 0 and less than 100.',
+            error:
+                'Maximum speed limit must be greater than 0 and less than 100.',
         };
     }
 
@@ -72,7 +79,9 @@ function gammaFromVelocity(v) {
 }
 
 function yearsToYearsDays(years) {
-    if (!Number.isFinite(years)) return 'Invalid time';
+    if (!Number.isFinite(years)) {
+        return 'Invalid time';
+    }
 
     const wholeYears = Math.floor(years);
     const days = (years - wholeYears) * DAYS_PER_YEAR;
@@ -82,37 +91,63 @@ function yearsToYearsDays(years) {
         return `${wholeYears + 1} years, 0.0 days`;
     }
 
-    return `${wholeYears} ${wholeYears === 1 ? 'year' : 'years'}, ${roundedDays.toFixed(1)} days`;
+    return `${wholeYears} ${
+        wholeYears === 1 ? 'year' : 'years'
+    }, ${roundedDays.toFixed(1)} days`;
 }
 
 function formatNumber(value, decimals = 4) {
-    if (!Number.isFinite(value)) return 'Invalid';
+    if (!Number.isFinite(value)) {
+        return 'Invalid';
+    }
+
     return Number(value.toFixed(decimals)).toString();
 }
 
 function formatPercent(value, decimals = 2) {
-    if (!Number.isFinite(value)) return 'Invalid';
+    if (!Number.isFinite(value)) {
+        return 'Invalid';
+    }
+
     return Number(value.toFixed(decimals)).toString();
 }
 
-function calculateHalfAccelerationTrip(totalDistanceLy, accelerationGs, speedLimitPercent = null) {
+function calculateHalfAccelerationTrip(
+    totalDistanceLy,
+    accelerationGs,
+    speedLimitPercent = null
+) {
     const a = accelerationGs * LY_PER_YEAR2_PER_G;
     const halfDistance = totalDistanceLy / 2;
 
     // Unrestricted halfway acceleration result.
-    const unrestrictedGammaMax = 1 + (a * halfDistance) / (C * C);
-    const unrestrictedVMax = Math.sqrt(1 - 1 / (unrestrictedGammaMax * unrestrictedGammaMax));
+    const unrestrictedGammaMax =
+        1 + (a * halfDistance) / (C * C);
+
+    const unrestrictedVMax = Math.sqrt(
+        1 -
+            1 /
+                (unrestrictedGammaMax *
+                    unrestrictedGammaMax)
+    );
 
     const hasLimiter = speedLimitPercent !== null;
-    const speedLimitFraction = hasLimiter ? speedLimitPercent / 100 : null;
+    const speedLimitFraction = hasLimiter
+        ? speedLimitPercent / 100
+        : null;
 
-    // If no limiter is entered, or if the limiter is above the ship's natural halfway speed,
-    // use the original accelerate-halfway/decelerate-halfway behavior.
-    if (!hasLimiter || speedLimitFraction >= unrestrictedVMax) {
+    // If no limiter is entered, or if the limiter is above the ship's
+    // natural halfway speed, use the original accelerate-halfway /
+    // decelerate-halfway behavior.
+    if (
+        !hasLimiter ||
+        speedLimitFraction >= unrestrictedVMax
+    ) {
         const rapidity = Math.acosh(unrestrictedGammaMax);
 
         const shipHalfTime = (C / a) * rapidity;
-        const observerHalfTime = (C / a) * Math.sinh(rapidity);
+        const observerHalfTime =
+            (C / a) * Math.sinh(rapidity);
 
         const shipTotalTime = shipHalfTime * 2;
         const observerTotalTime = observerHalfTime * 2;
@@ -141,22 +176,47 @@ function calculateHalfAccelerationTrip(totalDistanceLy, accelerationGs, speedLim
     }
 
     // Limited-speed version:
-    // Accelerate to speed limit, cruise, then decelerate to destination.
-    const gammaLimit = gammaFromVelocity(speedLimitFraction);
-    const rapidityLimit = atanh(speedLimitFraction);
+    // Accelerate to speed limit, cruise, then decelerate.
+    const gammaLimit =
+        gammaFromVelocity(speedLimitFraction);
 
-    const accelerationDistanceLy = (C * C / a) * (gammaLimit - 1);
-    const decelerationDistanceLy = accelerationDistanceLy;
-    const cruiseDistanceLy = Math.max(0, totalDistanceLy - accelerationDistanceLy - decelerationDistanceLy);
+    const rapidityLimit =
+        atanh(speedLimitFraction);
 
-    const observerAccelerationTime = (C / a) * Math.sinh(rapidityLimit);
-    const shipAccelerationTime = (C / a) * rapidityLimit;
+    const accelerationDistanceLy =
+        ((C * C) / a) * (gammaLimit - 1);
 
-    const observerCruiseTime = cruiseDistanceLy / speedLimitFraction;
-    const shipCruiseTime = observerCruiseTime / gammaLimit;
+    const decelerationDistanceLy =
+        accelerationDistanceLy;
 
-    const observerTotalTime = observerAccelerationTime + observerCruiseTime + observerAccelerationTime;
-    const shipTotalTime = shipAccelerationTime + shipCruiseTime + shipAccelerationTime;
+    const cruiseDistanceLy = Math.max(
+        0,
+        totalDistanceLy -
+            accelerationDistanceLy -
+            decelerationDistanceLy
+    );
+
+    const observerAccelerationTime =
+        (C / a) * Math.sinh(rapidityLimit);
+
+    const shipAccelerationTime =
+        (C / a) * rapidityLimit;
+
+    const observerCruiseTime =
+        cruiseDistanceLy / speedLimitFraction;
+
+    const shipCruiseTime =
+        observerCruiseTime / gammaLimit;
+
+    const observerTotalTime =
+        observerAccelerationTime +
+        observerCruiseTime +
+        observerAccelerationTime;
+
+    const shipTotalTime =
+        shipAccelerationTime +
+        shipCruiseTime +
+        shipAccelerationTime;
 
     return {
         mode: 'halfAcceleration',
@@ -175,24 +235,42 @@ function calculateHalfAccelerationTrip(totalDistanceLy, accelerationGs, speedLim
         shipCruiseTime,
         observerCruiseTime,
         shipDecelerationTime: shipAccelerationTime,
-        observerDecelerationTime: observerAccelerationTime,
+        observerDecelerationTime:
+            observerAccelerationTime,
         shipTotalTime,
         observerTotalTime,
     };
 }
 
-function calculateTargetVelocityCruiseTrip(totalDistanceLy, targetVelocityPercent, accelerationDistanceLy, decelerationDistanceLy) {
+function calculateTargetVelocityCruiseTrip(
+    totalDistanceLy,
+    targetVelocityPercent,
+    accelerationDistanceLy,
+    decelerationDistanceLy
+) {
     const vMax = targetVelocityPercent / 100;
 
     if (vMax <= 0 || vMax >= 1) {
-        throw new Error('Target velocity must be greater than 0% and less than 100% of c.');
+        throw new Error(
+            'Target velocity must be greater than 0% and less than 100% of c.'
+        );
     }
 
-    if (accelerationDistanceLy + decelerationDistanceLy > totalDistanceLy) {
-        throw new Error('Acceleration distance plus deceleration distance cannot exceed total distance.');
+    if (
+        accelerationDistanceLy +
+            decelerationDistanceLy >
+        totalDistanceLy
+    ) {
+        throw new Error(
+            'Acceleration distance plus deceleration distance cannot exceed total distance.'
+        );
     }
 
-    const cruiseDistanceLy = totalDistanceLy - accelerationDistanceLy - decelerationDistanceLy;
+    const cruiseDistanceLy =
+        totalDistanceLy -
+        accelerationDistanceLy -
+        decelerationDistanceLy;
+
     const gammaMax = gammaFromVelocity(vMax);
     const rapidity = atanh(vMax);
 
@@ -206,35 +284,60 @@ function calculateTargetVelocityCruiseTrip(totalDistanceLy, targetVelocityPercen
             };
         }
 
-        // Solves for the proper acceleration needed to reach vMax over this observer-frame distance.
-        const a = (C * C * (gammaMax - 1)) / distanceLy;
-        const observerTime = (C / a) * Math.sinh(rapidity);
-        const shipTime = (C / a) * rapidity;
+        // Solves for the proper acceleration needed to reach vMax
+        // over this observer-frame distance.
+        const a =
+            (C * C * (gammaMax - 1)) /
+            distanceLy;
+
+        const observerTime =
+            (C / a) * Math.sinh(rapidity);
+
+        const shipTime =
+            (C / a) * rapidity;
 
         return {
             accelerationLyPerYear2: a,
-            accelerationGs: a / LY_PER_YEAR2_PER_G,
+            accelerationGs:
+                a / LY_PER_YEAR2_PER_G,
             observerTime,
             shipTime,
         };
     }
 
-    const accelPhase = phaseFromDistance(accelerationDistanceLy);
-    const decelPhase = phaseFromDistance(decelerationDistanceLy);
+    const accelPhase =
+        phaseFromDistance(accelerationDistanceLy);
 
-    const observerCruiseTime = cruiseDistanceLy / vMax;
-    const shipCruiseTime = observerCruiseTime / gammaMax;
+    const decelPhase =
+        phaseFromDistance(decelerationDistanceLy);
 
-    const observerTotalTime = accelPhase.observerTime + observerCruiseTime + decelPhase.observerTime;
-    const shipTotalTime = accelPhase.shipTime + shipCruiseTime + decelPhase.shipTime;
+    const observerCruiseTime =
+        cruiseDistanceLy / vMax;
+
+    const shipCruiseTime =
+        observerCruiseTime / gammaMax;
+
+    const observerTotalTime =
+        accelPhase.observerTime +
+        observerCruiseTime +
+        decelPhase.observerTime;
+
+    const shipTotalTime =
+        accelPhase.shipTime +
+        shipCruiseTime +
+        decelPhase.shipTime;
 
     return {
         mode: 'targetVelocityCruise',
         totalDistanceLy,
-        accelerationGs: accelPhase.accelerationGs,
-        decelerationGs: decelPhase.accelerationGs,
-        accelerationLyPerYear2: accelPhase.accelerationLyPerYear2,
-        decelerationLyPerYear2: decelPhase.accelerationLyPerYear2,
+        accelerationGs:
+            accelPhase.accelerationGs,
+        decelerationGs:
+            decelPhase.accelerationGs,
+        accelerationLyPerYear2:
+            accelPhase.accelerationLyPerYear2,
+        decelerationLyPerYear2:
+            decelPhase.accelerationLyPerYear2,
         accelerationDistanceLy,
         cruiseDistanceLy,
         decelerationDistanceLy,
@@ -242,12 +345,16 @@ function calculateTargetVelocityCruiseTrip(totalDistanceLy, targetVelocityPercen
         gammaMax,
         speedLimitPercent: null,
         speedLimitReached: false,
-        shipAccelerationTime: accelPhase.shipTime,
-        observerAccelerationTime: accelPhase.observerTime,
+        shipAccelerationTime:
+            accelPhase.shipTime,
+        observerAccelerationTime:
+            accelPhase.observerTime,
         shipCruiseTime,
         observerCruiseTime,
-        shipDecelerationTime: decelPhase.shipTime,
-        observerDecelerationTime: decelPhase.observerTime,
+        shipDecelerationTime:
+            decelPhase.shipTime,
+        observerDecelerationTime:
+            decelPhase.observerTime,
         shipTotalTime,
         observerTotalTime,
     };
@@ -258,38 +365,96 @@ function generateChartData(results) {
     const distances = [];
     const velocities = [];
 
-    const totalDistance = results.totalDistanceLy;
-    const accelDistance = results.accelerationDistanceLy;
-    const cruiseDistance = results.cruiseDistanceLy;
-    const decelStart = accelDistance + cruiseDistance;
+    const totalDistance =
+        results.totalDistanceLy;
+
+    const accelDistance =
+        results.accelerationDistanceLy;
+
+    const cruiseDistance =
+        results.cruiseDistanceLy;
+
+    const decelStart =
+        accelDistance + cruiseDistance;
+
     const vMax = results.vMax;
 
     for (let i = 0; i <= numPoints; i++) {
-        const x = (totalDistance / numPoints) * i;
+        const x =
+            (totalDistance / numPoints) * i;
+
         let v = 0;
 
-        if (x <= accelDistance && accelDistance > 0) {
-            const gamma = 1 + (results.accelerationLyPerYear2 * x) / (C * C);
-            v = Math.sqrt(1 - 1 / (gamma * gamma));
+        if (
+            x <= accelDistance &&
+            accelDistance > 0
+        ) {
+            const gamma =
+                1 +
+                (results.accelerationLyPerYear2 *
+                    x) /
+                    (C * C);
+
+            v = Math.sqrt(
+                1 - 1 / (gamma * gamma)
+            );
         } else if (x <= decelStart) {
             v = vMax;
-        } else if (results.decelerationDistanceLy > 0) {
-            const decelAcceleration = results.decelerationLyPerYear2 || results.accelerationLyPerYear2;
-            const remainingDecelDistance = totalDistance - x;
-            const gamma = 1 + (decelAcceleration * remainingDecelDistance) / (C * C);
-            v = Math.sqrt(1 - 1 / (gamma * gamma));
+        } else if (
+            results.decelerationDistanceLy > 0
+        ) {
+            const decelAcceleration =
+                results.decelerationLyPerYear2 ||
+                results.accelerationLyPerYear2;
+
+            const remainingDecelDistance =
+                totalDistance - x;
+
+            const gamma =
+                1 +
+                (decelAcceleration *
+                    remainingDecelDistance) /
+                    (C * C);
+
+            v = Math.sqrt(
+                1 - 1 / (gamma * gamma)
+            );
         }
 
-        distances.push(Number(x.toFixed(4)));
-        velocities.push(Number((clamp(v, 0, 0.999999999999) * 100).toFixed(4)));
+        distances.push(
+            Number(x.toFixed(4))
+        );
+
+        velocities.push(
+            Number(
+                (
+                    clamp(
+                        v,
+                        0,
+                        0.999999999999
+                    ) * 100
+                ).toFixed(4)
+            )
+        );
     }
 
-    return { distances, velocities };
+    return {
+        distances,
+        velocities,
+    };
 }
 
 function buildResultsSummary(results) {
-    const timeLost = results.observerTotalTime - results.shipTotalTime;
-    const timeLostPercentage = results.observerTotalTime > 0 ? (timeLost / results.observerTotalTime) * 100 : 0;
+    const timeLost =
+        results.observerTotalTime -
+        results.shipTotalTime;
+
+    const timeLostPercentage =
+        results.observerTotalTime > 0
+            ? (timeLost /
+                  results.observerTotalTime) *
+              100
+            : 0;
 
     return {
         ...results,
@@ -302,93 +467,199 @@ function buildResultsSummary(results) {
 // -----------------------------
 // Routes
 // -----------------------------
+
+app.get('/healthz', (req, res) => {
+    res.status(200)
+        .type('text/plain')
+        .send('OK');
+});
+
 app.all('/', (req, res) => {
-    if (req.method === 'GET') {
+    // Express automatically uses the GET handler for HEAD requests.
+    // Handling both explicitly avoids attempting to read a request body
+    // from HEAD requests.
+    if (
+        req.method === 'GET' ||
+        req.method === 'HEAD'
+    ) {
         res.send(renderForm());
         return;
     }
 
-    const journeyMode = req.body.journeyMode || 'targetVelocityCruise';
+    // Body-parsing middleware normally creates req.body for POST
+    // requests. This fallback prevents malformed or bodyless requests
+    // from crashing the application.
+    const body = req.body || {};
+
+    const journeyMode =
+        body.journeyMode ||
+        'targetVelocityCruise';
+
     const errors = [];
 
-    const totalDistanceLy = parsePositiveNumber(req.body.distance);
+    const totalDistanceLy =
+        parsePositiveNumber(body.distance);
+
     if (totalDistanceLy === null) {
-        errors.push('Total distance is required and must be a positive number.');
+        errors.push(
+            'Total distance is required and must be a positive number.'
+        );
     }
 
     try {
         let rawResults;
 
-        if (journeyMode === 'halfAcceleration') {
-            const accelerationGs = parsePositiveNumber(req.body.acceleration);
-            const speedLimitResult = parseOptionalSpeedLimitPercent(req.body.speedLimit);
+        if (
+            journeyMode ===
+            'halfAcceleration'
+        ) {
+            const accelerationGs =
+                parsePositiveNumber(
+                    body.acceleration
+                );
+
+            const speedLimitResult =
+                parseOptionalSpeedLimitPercent(
+                    body.speedLimit
+                );
 
             if (accelerationGs === null) {
-                errors.push('Gravity drive output is required and must be a positive number.');
+                errors.push(
+                    'Gravity drive output is required and must be a positive number.'
+                );
             }
 
             if (speedLimitResult.error) {
-                errors.push(speedLimitResult.error);
+                errors.push(
+                    speedLimitResult.error
+                );
             }
 
             if (errors.length > 0) {
-                res.send(renderForm(errors, req.body));
+                res.send(
+                    renderForm(
+                        errors,
+                        body
+                    )
+                );
                 return;
             }
 
-            rawResults = calculateHalfAccelerationTrip(
-                totalDistanceLy,
-                accelerationGs,
-                speedLimitResult.value
-            );
-        } else if (journeyMode === 'targetVelocityCruise') {
-            const targetVelocityPercent = parsePositiveNumber(req.body.targetVelocity);
-            const accelerationDistanceLy = parseNonNegativeNumber(req.body.accelerationDistance);
-            const decelerationDistanceLy = parseNonNegativeNumber(req.body.decelerationDistance);
+            rawResults =
+                calculateHalfAccelerationTrip(
+                    totalDistanceLy,
+                    accelerationGs,
+                    speedLimitResult.value
+                );
+        } else if (
+            journeyMode ===
+            'targetVelocityCruise'
+        ) {
+            const targetVelocityPercent =
+                parsePositiveNumber(
+                    body.targetVelocity
+                );
 
-            if (targetVelocityPercent === null || targetVelocityPercent >= 100) {
-                errors.push('Target velocity is required and must be greater than 0 and less than 100.');
+            const accelerationDistanceLy =
+                parseNonNegativeNumber(
+                    body.accelerationDistance
+                );
+
+            const decelerationDistanceLy =
+                parseNonNegativeNumber(
+                    body.decelerationDistance
+                );
+
+            if (
+                targetVelocityPercent === null ||
+                targetVelocityPercent >= 100
+            ) {
+                errors.push(
+                    'Target velocity is required and must be greater than 0 and less than 100.'
+                );
             }
 
-            if (accelerationDistanceLy === null) {
-                errors.push('Acceleration distance is required and must be zero or greater.');
+            if (
+                accelerationDistanceLy === null
+            ) {
+                errors.push(
+                    'Acceleration distance is required and must be zero or greater.'
+                );
             }
 
-            if (decelerationDistanceLy === null) {
-                errors.push('Deceleration distance is required and must be zero or greater.');
+            if (
+                decelerationDistanceLy === null
+            ) {
+                errors.push(
+                    'Deceleration distance is required and must be zero or greater.'
+                );
             }
 
             if (
                 totalDistanceLy !== null &&
-                accelerationDistanceLy !== null &&
-                decelerationDistanceLy !== null &&
-                accelerationDistanceLy + decelerationDistanceLy > totalDistanceLy
+                accelerationDistanceLy !==
+                    null &&
+                decelerationDistanceLy !==
+                    null &&
+                accelerationDistanceLy +
+                    decelerationDistanceLy >
+                    totalDistanceLy
             ) {
-                errors.push('Acceleration distance plus deceleration distance cannot exceed total distance.');
+                errors.push(
+                    'Acceleration distance plus deceleration distance cannot exceed total distance.'
+                );
             }
 
             if (errors.length > 0) {
-                res.send(renderForm(errors, req.body));
+                res.send(
+                    renderForm(
+                        errors,
+                        body
+                    )
+                );
                 return;
             }
 
-            rawResults = calculateTargetVelocityCruiseTrip(
-                totalDistanceLy,
-                targetVelocityPercent,
-                accelerationDistanceLy,
-                decelerationDistanceLy
-            );
+            rawResults =
+                calculateTargetVelocityCruiseTrip(
+                    totalDistanceLy,
+                    targetVelocityPercent,
+                    accelerationDistanceLy,
+                    decelerationDistanceLy
+                );
         } else {
-            errors.push('Unknown journey mode.');
-            res.send(renderForm(errors, req.body));
+            errors.push(
+                'Unknown journey mode.'
+            );
+
+            res.send(
+                renderForm(errors, body)
+            );
+
             return;
         }
 
-        const results = buildResultsSummary(rawResults);
-        res.send(renderForm(null, buildFormDataFromResults(results), results));
+        const results =
+            buildResultsSummary(rawResults);
+
+        res.send(
+            renderForm(
+                null,
+                buildFormDataFromResults(
+                    results
+                ),
+                results
+            )
+        );
     } catch (error) {
-        errors.push(error.message || 'An error occurred during calculations. Please check your inputs.');
-        res.send(renderForm(errors, req.body));
+        errors.push(
+            error.message ||
+                'An error occurred during calculations. Please check your inputs.'
+        );
+
+        res.send(
+            renderForm(errors, body)
+        );
     }
 });
 
@@ -396,20 +667,30 @@ function buildFormDataFromResults(results) {
     return {
         journeyMode: results.mode,
         distance: results.totalDistanceLy,
-        acceleration: results.accelerationGs ?? '',
-        speedLimit: results.speedLimitPercent ?? '',
-        targetVelocity: results.vMax * 100,
-        accelerationDistance: results.accelerationDistanceLy,
-        decelerationDistance: results.decelerationDistanceLy,
+        acceleration:
+            results.accelerationGs ?? '',
+        speedLimit:
+            results.speedLimitPercent ?? '',
+        targetVelocity:
+            results.vMax * 100,
+        accelerationDistance:
+            results.accelerationDistanceLy,
+        decelerationDistance:
+            results.decelerationDistanceLy,
     };
 }
 
 // -----------------------------
 // Rendering
 // -----------------------------
-function renderForm(errors = null, formData = {}, results = null) {
+function renderForm(
+    errors = null,
+    formData = {},
+    results = null
+) {
     const {
-        journeyMode = 'targetVelocityCruise',
+        journeyMode =
+            'targetVelocityCruise',
         distance = '20',
         acceleration = '1',
         speedLimit = '',
@@ -419,11 +700,25 @@ function renderForm(errors = null, formData = {}, results = null) {
     } = formData;
 
     const errorMessages = errors
-    ? `<div class="error-box"><ul>${errors.map((error) => `<li>${escapeHtml(error)}</li>`).join('')}</ul></div>`
-    : '';
+        ? `<div class="error-box"><ul>${errors
+              .map(
+                  (error) =>
+                      `<li>${escapeHtml(
+                          error
+                      )}</li>`
+              )
+              .join('')}</ul></div>`
+        : '';
 
-    const resultsSection = results ? renderResults(results) : '';
-    const chartScript = results ? renderChartScript(results.chartData) : '';
+    const resultsSection = results
+        ? renderResults(results)
+        : '';
+
+    const chartScript = results
+        ? renderChartScript(
+              results.chartData
+          )
+        : '';
 
     return `
     <!DOCTYPE html>
@@ -516,7 +811,9 @@ function renderForm(errors = null, formData = {}, results = null) {
         opacity: 0.7;
     }
 
-    .error-box, .results-box, .note-box {
+    .error-box,
+    .results-box,
+    .note-box {
         background-color: #2b2b2b;
         padding: 1em;
         border-radius: 5px;
@@ -544,7 +841,8 @@ function renderForm(errors = null, formData = {}, results = null) {
         margin-top: 1em;
     }
 
-    th, td {
+    th,
+    td {
         border-bottom: 1px solid #444;
         padding: 0.65em;
         text-align: left;
@@ -565,11 +863,11 @@ function renderForm(errors = null, formData = {}, results = null) {
     }
 
     #copy-button {
-    position: absolute;
-    top: 10px;
-    right: 10px;
-    padding: 0.45em 0.7em;
-    margin: 0;
+        position: absolute;
+        top: 10px;
+        right: 10px;
+        padding: 0.45em 0.7em;
+        margin: 0;
     }
 
     .chart-controls {
@@ -587,10 +885,10 @@ function renderForm(errors = null, formData = {}, results = null) {
     }
 
     #zoom-level-label {
-    color: #bdbdbd;
-    min-width: 90px;
-    text-align: center;
-    font-size: 0.95em;
+        color: #bdbdbd;
+        min-width: 90px;
+        text-align: center;
+        font-size: 0.95em;
     }
 
     .chart-scroll-container {
@@ -619,15 +917,15 @@ function renderForm(errors = null, formData = {}, results = null) {
     }
 
     #chart-inner {
-    width: 100%;
-    height: 390px;
-    position: relative;
-    transition: width 0.18s ease-in-out;
+        width: 100%;
+        height: 390px;
+        position: relative;
+        transition: width 0.18s ease-in-out;
     }
 
     #velocityChart {
-    width: 100% !important;
-    height: 390px !important;
+        width: 100% !important;
+        height: 390px !important;
     }
 
     .hidden {
@@ -645,9 +943,9 @@ function renderForm(errors = null, formData = {}, results = null) {
         }
 
         #copy-button {
-        position: static;
-        float: right;
-        margin-bottom: 1em;
+            position: static;
+            float: right;
+            margin-bottom: 1em;
         }
     }
     </style>
@@ -665,99 +963,282 @@ function renderForm(errors = null, formData = {}, results = null) {
 
     <fieldset>
     <legend>Journey Profile</legend>
+
     <label class="mode-option">
-    <input type="radio" name="journeyMode" value="targetVelocityCruise" ${journeyMode === 'targetVelocityCruise' ? 'checked' : ''}>
+    <input
+        type="radio"
+        name="journeyMode"
+        value="targetVelocityCruise"
+        ${
+            journeyMode ===
+            'targetVelocityCruise'
+                ? 'checked'
+                : ''
+        }
+    >
     Accelerate to target speed, cruise, then decelerate
     </label>
+
     <label class="mode-option">
-    <input type="radio" name="journeyMode" value="halfAcceleration" ${journeyMode === 'halfAcceleration' ? 'checked' : ''}>
+    <input
+        type="radio"
+        name="journeyMode"
+        value="halfAcceleration"
+        ${
+            journeyMode ===
+            'halfAcceleration'
+                ? 'checked'
+                : ''
+        }
+    >
     Accelerate to halfway point, then decelerate to destination
     </label>
     </fieldset>
 
     <fieldset>
     <legend>Trip</legend>
+
     <div class="input-group">
-    <label for="distance">Total Distance (light-years):</label>
-    <input type="number" name="distance" id="distance" required min="0.0001" step="any" value="${escapeHtml(distance)}">
+    <label for="distance">
+    Total Distance (light-years):
+    </label>
+
+    <input
+        type="number"
+        name="distance"
+        id="distance"
+        required
+        min="0.0001"
+        step="any"
+        value="${escapeHtml(distance)}"
+    >
     </div>
     </fieldset>
 
     <fieldset id="targetVelocityFields">
     <legend>Target Velocity + Cruise Mode</legend>
+
     <div class="input-group">
-    <label for="targetVelocity">Target / Cruise Velocity (% of c):</label>
-    <input type="number" name="targetVelocity" id="targetVelocity" min="0.0001" max="99.999999" step="any" value="${escapeHtml(targetVelocity)}">
+    <label for="targetVelocity">
+    Target / Cruise Velocity (% of c):
+    </label>
+
+    <input
+        type="number"
+        name="targetVelocity"
+        id="targetVelocity"
+        min="0.0001"
+        max="99.999999"
+        step="any"
+        value="${escapeHtml(
+            targetVelocity
+        )}"
+    >
     </div>
+
     <div class="input-group">
-    <label for="accelerationDistance">Acceleration Distance (light-years):</label>
-    <input type="number" name="accelerationDistance" id="accelerationDistance" min="0" step="any" value="${escapeHtml(accelerationDistance)}">
+    <label for="accelerationDistance">
+    Acceleration Distance (light-years):
+    </label>
+
+    <input
+        type="number"
+        name="accelerationDistance"
+        id="accelerationDistance"
+        min="0"
+        step="any"
+        value="${escapeHtml(
+            accelerationDistance
+        )}"
+    >
     </div>
+
     <div class="input-group">
-    <label for="decelerationDistance">Deceleration Distance (light-years):</label>
-    <input type="number" name="decelerationDistance" id="decelerationDistance" min="0" step="any" value="${escapeHtml(decelerationDistance)}">
+    <label for="decelerationDistance">
+    Deceleration Distance (light-years):
+    </label>
+
+    <input
+        type="number"
+        name="decelerationDistance"
+        id="decelerationDistance"
+        min="0"
+        step="any"
+        value="${escapeHtml(
+            decelerationDistance
+        )}"
+    >
     </div>
-    <p class="small">Example: 20 ly total, 99% c, 1 ly acceleration, 1 ly deceleration gives an 18 ly cruise.</p>
+
+    <p class="small">
+    Example: 20 ly total, 99% c, 1 ly acceleration, 1 ly deceleration gives an 18 ly cruise.
+    </p>
     </fieldset>
 
     <fieldset id="halfAccelerationFields">
     <legend>Halfway Acceleration Mode</legend>
+
     <div class="input-group">
-    <label for="acceleration">Gravity Drive Output (g):</label>
-    <input type="number" name="acceleration" id="acceleration" min="0.01" step="0.01" value="${escapeHtml(acceleration)}">
+    <label for="acceleration">
+    Gravity Drive Output (g):
+    </label>
+
+    <input
+        type="number"
+        name="acceleration"
+        id="acceleration"
+        min="0.01"
+        step="0.01"
+        value="${escapeHtml(
+            acceleration
+        )}"
+    >
     </div>
+
     <div class="input-group">
-    <label for="speedLimit">Maximum Speed Limit (% of c, optional):</label>
-    <input type="number" name="speedLimit" id="speedLimit" min="0.01" max="99.99" step="0.01" value="${escapeHtml(speedLimit)}" placeholder="No limit">
+    <label for="speedLimit">
+    Maximum Speed Limit (% of c, optional):
+    </label>
+
+    <input
+        type="number"
+        name="speedLimit"
+        id="speedLimit"
+        min="0.01"
+        max="99.99"
+        step="0.01"
+        value="${escapeHtml(
+            speedLimit
+        )}"
+        placeholder="No limit"
+    >
     </div>
-    <p class="small">Leave blank for no speed limit. If entered, the ship accelerates to this speed, cruises, then decelerates. Uses real Earth gravity conversion: 1g ≈ ${formatNumber(LY_PER_YEAR2_PER_G, 6)} ly/yr².</p>
+
+    <p class="small">
+    Leave blank for no speed limit. If entered, the ship accelerates to this speed, cruises, then decelerates. Uses real Earth gravity conversion: 1g ≈ ${formatNumber(
+        LY_PER_YEAR2_PER_G,
+        6
+    )} ly/yr².
+    </p>
     </fieldset>
 
-    <button type="submit">Calculate</button>
+    <button type="submit">
+    Calculate
+    </button>
     </form>
 
     ${resultsSection}
     </div>
 
     <script>
-    document.addEventListener('DOMContentLoaded', () => {
-        const modeRadios = document.querySelectorAll('input[name="journeyMode"]');
-        const targetVelocityFields = document.getElementById('targetVelocityFields');
-        const halfAccelerationFields = document.getElementById('halfAccelerationFields');
-        const copyButton = document.getElementById('copy-button');
+    document.addEventListener(
+        'DOMContentLoaded',
+        () => {
+            const modeRadios =
+                document.querySelectorAll(
+                    'input[name="journeyMode"]'
+                );
 
-        function setFieldsetInputsDisabled(fieldset, disabled) {
-            const inputs = fieldset.querySelectorAll('input, select, textarea, button');
-            inputs.forEach((input) => {
-                input.disabled = disabled;
-            });
+            const targetVelocityFields =
+                document.getElementById(
+                    'targetVelocityFields'
+                );
+
+            const halfAccelerationFields =
+                document.getElementById(
+                    'halfAccelerationFields'
+                );
+
+            const copyButton =
+                document.getElementById(
+                    'copy-button'
+                );
+
+            function setFieldsetInputsDisabled(
+                fieldset,
+                disabled
+            ) {
+                const inputs =
+                    fieldset.querySelectorAll(
+                        'input, select, textarea, button'
+                    );
+
+                inputs.forEach((input) => {
+                    input.disabled = disabled;
+                });
+            }
+
+            function updateModeVisibility() {
+                const selected =
+                    document.querySelector(
+                        'input[name="journeyMode"]:checked'
+                    ).value;
+
+                const usingTargetVelocityCruise =
+                    selected ===
+                    'targetVelocityCruise';
+
+                const usingHalfAcceleration =
+                    selected ===
+                    'halfAcceleration';
+
+                targetVelocityFields.classList.toggle(
+                    'hidden',
+                    !usingTargetVelocityCruise
+                );
+
+                halfAccelerationFields.classList.toggle(
+                    'hidden',
+                    !usingHalfAcceleration
+                );
+
+                setFieldsetInputsDisabled(
+                    targetVelocityFields,
+                    !usingTargetVelocityCruise
+                );
+
+                setFieldsetInputsDisabled(
+                    halfAccelerationFields,
+                    !usingHalfAcceleration
+                );
+            }
+
+            modeRadios.forEach((radio) =>
+                radio.addEventListener(
+                    'change',
+                    updateModeVisibility
+                )
+            );
+
+            updateModeVisibility();
+
+            if (copyButton) {
+                copyButton.addEventListener(
+                    'click',
+                    () => {
+                        const resultsText =
+                            document.getElementById(
+                                'results-text'
+                            ).innerText;
+
+                        navigator.clipboard
+                            .writeText(resultsText)
+                            .then(() =>
+                                alert(
+                                    'Results copied to clipboard.'
+                                )
+                            )
+                            .catch((error) =>
+                                alert(
+                                    'Failed to copy results: ' +
+                                        error
+                                )
+                            );
+                    }
+                );
+            }
         }
-
-        function updateModeVisibility() {
-            const selected = document.querySelector('input[name="journeyMode"]:checked').value;
-
-            const usingTargetVelocityCruise = selected === 'targetVelocityCruise';
-            const usingHalfAcceleration = selected === 'halfAcceleration';
-
-            targetVelocityFields.classList.toggle('hidden', !usingTargetVelocityCruise);
-            halfAccelerationFields.classList.toggle('hidden', !usingHalfAcceleration);
-
-            setFieldsetInputsDisabled(targetVelocityFields, !usingTargetVelocityCruise);
-            setFieldsetInputsDisabled(halfAccelerationFields, !usingHalfAcceleration);
-        }
-
-        modeRadios.forEach((radio) => radio.addEventListener('change', updateModeVisibility));
-        updateModeVisibility();
-
-        if (copyButton) {
-            copyButton.addEventListener('click', () => {
-                const resultsText = document.getElementById('results-text').innerText;
-                navigator.clipboard.writeText(resultsText)
-                .then(() => alert('Results copied to clipboard.'))
-                .catch((err) => alert('Failed to copy results: ' + err));
-            });
-        }
-    });
+    );
     </script>
 
     ${chartScript}
@@ -766,37 +1247,143 @@ function renderForm(errors = null, formData = {}, results = null) {
 }
 
 function renderResults(results) {
-    const maxVelocityPercent = results.vMax * 100;
+    const maxVelocityPercent =
+        results.vMax * 100;
+
     const timeLost = results.timeLost;
-    const timeLostPercentage = results.timeLostPercentage;
 
-    const accelerationText = results.mode === 'halfAcceleration'
-    ? `${formatNumber(results.accelerationGs, 4)} g`
-    : `${formatNumber(results.accelerationGs, 4)} g acceleration / ${formatNumber(results.decelerationGs, 4)} g deceleration`;
+    const timeLostPercentage =
+        results.timeLostPercentage;
 
-    const speedLimitLine = results.mode === 'halfAcceleration' && results.speedLimitPercent !== null
-    ? `<p><strong>Maximum Speed Limit:</strong> ${formatPercent(results.speedLimitPercent, 2)}% of c ${results.speedLimitReached ? '(reached; cruise phase added)' : '(not reached before halfway point)'}</p>`
-    : '';
+    const accelerationText =
+        results.mode ===
+        'halfAcceleration'
+            ? `${formatNumber(
+                  results.accelerationGs,
+                  4
+              )} g`
+            : `${formatNumber(
+                  results.accelerationGs,
+                  4
+              )} g acceleration / ${formatNumber(
+                  results.decelerationGs,
+                  4
+              )} g deceleration`;
 
-    const cruiseLine = results.cruiseDistanceLy > 0
-    ? `<tr><td>Cruise</td><td>${formatNumber(results.cruiseDistanceLy, 4)} ly</td><td>${yearsToYearsDays(results.observerCruiseTime)}</td><td>${yearsToYearsDays(results.shipCruiseTime)}</td></tr>`
-    : '';
+    const speedLimitLine =
+        results.mode ===
+            'halfAcceleration' &&
+        results.speedLimitPercent !== null
+            ? `<p><strong>Maximum Speed Limit:</strong> ${formatPercent(
+                  results.speedLimitPercent,
+                  2
+              )}% of c ${
+                  results.speedLimitReached
+                      ? '(reached; cruise phase added)'
+                      : '(not reached before halfway point)'
+              }</p>`
+            : '';
+
+    const cruiseLine =
+        results.cruiseDistanceLy > 0
+            ? `<tr>
+<td>Cruise</td>
+<td>${formatNumber(
+                  results.cruiseDistanceLy,
+                  4
+              )} ly</td>
+<td>${yearsToYearsDays(
+                  results.observerCruiseTime
+              )}</td>
+<td>${yearsToYearsDays(
+                  results.shipCruiseTime
+              )}</td>
+</tr>`
+            : '';
 
     return `
     <div class="results-box">
-    <button id="copy-button" type="button" title="Copy Results to Clipboard">Copy</button>
+    <button
+        id="copy-button"
+        type="button"
+        title="Copy Results to Clipboard"
+    >
+    Copy
+    </button>
+
     <h2>Results</h2>
+
     <div id="results-text">
-    <p><strong>Total Distance:</strong> ${formatNumber(results.totalDistanceLy, 4)} light-years</p>
-    <p><strong>Journey Profile:</strong> ${results.mode === 'halfAcceleration' ? 'Accelerate to halfway point, then decelerate to destination' : 'Accelerate, cruise, decelerate'}</p>
-    <p><strong>Maximum Velocity:</strong> ${formatPercent(maxVelocityPercent, 4)}% of c</p>
+    <p>
+    <strong>Total Distance:</strong>
+    ${formatNumber(
+        results.totalDistanceLy,
+        4
+    )} light-years
+    </p>
+
+    <p>
+    <strong>Journey Profile:</strong>
+    ${
+        results.mode ===
+        'halfAcceleration'
+            ? 'Accelerate to halfway point, then decelerate to destination'
+            : 'Accelerate, cruise, decelerate'
+    }
+    </p>
+
+    <p>
+    <strong>Maximum Velocity:</strong>
+    ${formatPercent(
+        maxVelocityPercent,
+        4
+    )}% of c
+    </p>
+
     ${speedLimitLine}
-    <p><strong>Required Gravity Drive Output:</strong> ${accelerationText}</p>
-    <p><strong>Total Observer Time:</strong> ${yearsToYearsDays(results.observerTotalTime)} (${formatNumber(results.observerTotalTime, 4)} years)</p>
-    <p><strong>Total Ship Time:</strong> ${yearsToYearsDays(results.shipTotalTime)} (${formatNumber(results.shipTotalTime, 4)} years)</p>
-    <p><strong>Time Difference:</strong> ${yearsToYearsDays(timeLost)} (${formatNumber(timeLost, 4)} years, ${formatPercent(timeLostPercentage, 2)}% of observer time)</p>
+
+    <p>
+    <strong>Required Gravity Drive Output:</strong>
+    ${accelerationText}
+    </p>
+
+    <p>
+    <strong>Total Observer Time:</strong>
+    ${yearsToYearsDays(
+        results.observerTotalTime
+    )}
+    (${formatNumber(
+        results.observerTotalTime,
+        4
+    )} years)
+    </p>
+
+    <p>
+    <strong>Total Ship Time:</strong>
+    ${yearsToYearsDays(
+        results.shipTotalTime
+    )}
+    (${formatNumber(
+        results.shipTotalTime,
+        4
+    )} years)
+    </p>
+
+    <p>
+    <strong>Time Difference:</strong>
+    ${yearsToYearsDays(timeLost)}
+    (${formatNumber(
+        timeLost,
+        4
+    )} years,
+    ${formatPercent(
+        timeLostPercentage,
+        2
+    )}% of observer time)
+    </p>
 
     <h3>Phase Breakdown</h3>
+
     <table>
     <thead>
     <tr>
@@ -806,37 +1393,88 @@ function renderResults(results) {
     <th>Ship Time</th>
     </tr>
     </thead>
+
     <tbody>
     <tr>
     <td>Acceleration</td>
-    <td>${formatNumber(results.accelerationDistanceLy, 4)} ly</td>
-    <td>${yearsToYearsDays(results.observerAccelerationTime)}</td>
-    <td>${yearsToYearsDays(results.shipAccelerationTime)}</td>
+    <td>${formatNumber(
+        results.accelerationDistanceLy,
+        4
+    )} ly</td>
+    <td>${yearsToYearsDays(
+        results.observerAccelerationTime
+    )}</td>
+    <td>${yearsToYearsDays(
+        results.shipAccelerationTime
+    )}</td>
     </tr>
+
     ${cruiseLine}
+
     <tr>
     <td>Deceleration</td>
-    <td>${formatNumber(results.decelerationDistanceLy, 4)} ly</td>
-    <td>${yearsToYearsDays(results.observerDecelerationTime)}</td>
-    <td>${yearsToYearsDays(results.shipDecelerationTime)}</td>
+    <td>${formatNumber(
+        results.decelerationDistanceLy,
+        4
+    )} ly</td>
+    <td>${yearsToYearsDays(
+        results.observerDecelerationTime
+    )}</td>
+    <td>${yearsToYearsDays(
+        results.shipDecelerationTime
+    )}</td>
     </tr>
+
     <tr class="total-row">
     <td><strong>Total</strong></td>
-    <td><strong>${formatNumber(results.totalDistanceLy, 4)} ly</strong></td>
-    <td><strong>${yearsToYearsDays(results.observerTotalTime)}</strong></td>
-    <td><strong>${yearsToYearsDays(results.shipTotalTime)}</strong></td>
+    <td>
+    <strong>${formatNumber(
+        results.totalDistanceLy,
+        4
+    )} ly</strong>
+    </td>
+    <td>
+    <strong>${yearsToYearsDays(
+        results.observerTotalTime
+    )}</strong>
+    </td>
+    <td>
+    <strong>${yearsToYearsDays(
+        results.shipTotalTime
+    )}</strong>
+    </td>
     </tr>
     </tbody>
     </table>
     </div>
     </div>
+
     <div class="results-box">
     <div class="chart-controls">
-    <button id="zoom-out-button" type="button" disabled>Zoom Out</button>
-    <span id="zoom-level-label">Zoom 0 / 5</span>
-    <button id="zoom-in-button" type="button">Zoom In</button>
+    <button
+        id="zoom-out-button"
+        type="button"
+        disabled
+    >
+    Zoom Out
+    </button>
+
+    <span id="zoom-level-label">
+    Zoom 0 / 5
+    </span>
+
+    <button
+        id="zoom-in-button"
+        type="button"
+    >
+    Zoom In
+    </button>
     </div>
-    <div class="chart-scroll-container" id="chart-scroll-container">
+
+    <div
+        class="chart-scroll-container"
+        id="chart-scroll-container"
+    >
     <div id="chart-inner">
     <canvas id="velocityChart"></canvas>
     </div>
@@ -848,20 +1486,62 @@ function renderChartScript(chartData) {
     return `
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script>
-    const ctx = document.getElementById('velocityChart').getContext('2d');
-    const chartInner = document.getElementById('chart-inner');
-    const chartScrollContainer = document.getElementById('chart-scroll-container');
-    const zoomInButton = document.getElementById('zoom-in-button');
-    const zoomOutButton = document.getElementById('zoom-out-button');
-    const zoomLevelLabel = document.getElementById('zoom-level-label');
+    const ctx =
+        document
+            .getElementById(
+                'velocityChart'
+            )
+            .getContext('2d');
+
+    const chartInner =
+        document.getElementById(
+            'chart-inner'
+        );
+
+    const chartScrollContainer =
+        document.getElementById(
+            'chart-scroll-container'
+        );
+
+    const zoomInButton =
+        document.getElementById(
+            'zoom-in-button'
+        );
+
+    const zoomOutButton =
+        document.getElementById(
+            'zoom-out-button'
+        );
+
+    const zoomLevelLabel =
+        document.getElementById(
+            'zoom-level-label'
+        );
 
     let zoomLevel = 0;
-    const maxZoomLevel = 5;
-    const zoomWidthMultipliers = [1, 1.75, 2.5, 3.5, 4.75, 6];
 
-    function distanceLabelDecimalsForZoom(level) {
-        if (level <= 0) return 2;
-        if (level <= 2) return 3;
+    const maxZoomLevel = 5;
+
+    const zoomWidthMultipliers = [
+        1,
+        1.75,
+        2.5,
+        3.5,
+        4.75,
+        6
+    ];
+
+    function distanceLabelDecimalsForZoom(
+        level
+    ) {
+        if (level <= 0) {
+            return 2;
+        }
+
+        if (level <= 2) {
+            return 3;
+        }
+
         return 4;
     }
 
@@ -870,102 +1550,195 @@ function renderChartScript(chartData) {
     }
 
     const data = {
-        labels: ${JSON.stringify(chartData.distances)},
-        datasets: [{
-            label: 'Velocity (% of c)',
-            data: ${JSON.stringify(chartData.velocities)},
-            borderColor: '#1e88e5',
-            backgroundColor: 'rgba(30, 136, 229, 0.2)',
-            fill: true,
-            tension: 0.1,
-        }]
+        labels: ${JSON.stringify(
+            chartData.distances
+        )},
+        datasets: [
+            {
+                label:
+                    'Velocity (% of c)',
+                data: ${JSON.stringify(
+                    chartData.velocities
+                )},
+                borderColor:
+                    '#1e88e5',
+                backgroundColor:
+                    'rgba(30, 136, 229, 0.2)',
+                fill: true,
+                tension: 0.1
+            }
+        ]
     };
 
-    const velocityChart = new Chart(ctx, {
-        type: 'line',
-        data,
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            animation: false,
-            plugins: {
-                legend: {
-                    labels: { color: '#e0e0e0' }
-                }
-            },
-            scales: {
-                x: {
-                    title: {
-                        display: true,
-                        text: 'Distance (light-years)',
-                                    color: '#e0e0e0'
-                    },
-                    ticks: {
-                        color: '#e0e0e0',
-                        autoSkip: true,
-                        maxTicksLimit: maxTicksForZoom(zoomLevel),
-                                    callback: function(value) {
-                                        const num = Number(this.getLabelForValue(value));
-                                        const decimals = distanceLabelDecimalsForZoom(zoomLevel);
-                                        return Number(num.toFixed(decimals)).toString();
-                                    }
+    const velocityChart =
+        new Chart(ctx, {
+            type: 'line',
+            data,
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                animation: false,
+                plugins: {
+                    legend: {
+                        labels: {
+                            color:
+                                '#e0e0e0'
+                        }
                     }
                 },
-                y: {
-                    title: {
-                        display: true,
-                        text: 'Velocity (% of c)',
-                                    color: '#e0e0e0'
+                scales: {
+                    x: {
+                        title: {
+                            display: true,
+                            text:
+                                'Distance (light-years)',
+                            color:
+                                '#e0e0e0'
+                        },
+                        ticks: {
+                            color:
+                                '#e0e0e0',
+                            autoSkip: true,
+                            maxTicksLimit:
+                                maxTicksForZoom(
+                                    zoomLevel
+                                ),
+                            callback:
+                                function (
+                                    value
+                                ) {
+                                    const num =
+                                        Number(
+                                            this.getLabelForValue(
+                                                value
+                                            )
+                                        );
+
+                                    const decimals =
+                                        distanceLabelDecimalsForZoom(
+                                            zoomLevel
+                                        );
+
+                                    return Number(
+                                        num.toFixed(
+                                            decimals
+                                        )
+                                    ).toString();
+                                }
+                        }
                     },
-                    ticks: { color: '#e0e0e0' },
-                    min: 0,
-                    max: 100
+                    y: {
+                        title: {
+                            display: true,
+                            text:
+                                'Velocity (% of c)',
+                            color:
+                                '#e0e0e0'
+                        },
+                        ticks: {
+                            color:
+                                '#e0e0e0'
+                        },
+                        min: 0,
+                        max: 100
+                    }
                 }
             }
-        }
-    });
+        });
 
     function updateZoomControls() {
-        const widthPercent = zoomWidthMultipliers[zoomLevel] * 100;
-        chartInner.style.width = widthPercent + '%';
+        const widthPercent =
+            zoomWidthMultipliers[
+                zoomLevel
+            ] * 100;
 
-        velocityChart.options.scales.x.ticks.maxTicksLimit = maxTicksForZoom(zoomLevel);
+        chartInner.style.width =
+            widthPercent + '%';
+
+        velocityChart.options.scales.x.ticks.maxTicksLimit =
+            maxTicksForZoom(
+                zoomLevel
+            );
+
         velocityChart.update('none');
 
-        zoomOutButton.disabled = zoomLevel === 0;
-        zoomInButton.disabled = zoomLevel === maxZoomLevel;
-        zoomLevelLabel.textContent = 'Zoom ' + zoomLevel + ' / ' + maxZoomLevel;
+        zoomOutButton.disabled =
+            zoomLevel === 0;
+
+        zoomInButton.disabled =
+            zoomLevel ===
+            maxZoomLevel;
+
+        zoomLevelLabel.textContent =
+            'Zoom ' +
+            zoomLevel +
+            ' / ' +
+            maxZoomLevel;
 
         if (zoomLevel === 0) {
-            chartScrollContainer.scrollLeft = 0;
+            chartScrollContainer.scrollLeft =
+                0;
         }
     }
 
-    zoomInButton.addEventListener('click', () => {
-        if (zoomLevel >= maxZoomLevel) return;
+    zoomInButton.addEventListener(
+        'click',
+        () => {
+            if (
+                zoomLevel >=
+                maxZoomLevel
+            ) {
+                return;
+            }
 
-        const previousScrollRatio = chartScrollContainer.scrollLeft /
-        Math.max(1, chartScrollContainer.scrollWidth - chartScrollContainer.clientWidth);
+            const previousScrollRatio =
+                chartScrollContainer.scrollLeft /
+                Math.max(
+                    1,
+                    chartScrollContainer.scrollWidth -
+                        chartScrollContainer.clientWidth
+                );
 
-        zoomLevel += 1;
-        updateZoomControls();
+            zoomLevel += 1;
+            updateZoomControls();
 
-        const newMaxScroll = chartScrollContainer.scrollWidth - chartScrollContainer.clientWidth;
-        chartScrollContainer.scrollLeft = previousScrollRatio * newMaxScroll;
-    });
+            const newMaxScroll =
+                chartScrollContainer.scrollWidth -
+                chartScrollContainer.clientWidth;
 
-    zoomOutButton.addEventListener('click', () => {
-        if (zoomLevel <= 0) return;
+            chartScrollContainer.scrollLeft =
+                previousScrollRatio *
+                newMaxScroll;
+        }
+    );
 
-        const previousScrollRatio = chartScrollContainer.scrollLeft /
-        Math.max(1, chartScrollContainer.scrollWidth - chartScrollContainer.clientWidth);
+    zoomOutButton.addEventListener(
+        'click',
+        () => {
+            if (zoomLevel <= 0) {
+                return;
+            }
 
-        zoomLevel -= 1;
-        updateZoomControls();
+            const previousScrollRatio =
+                chartScrollContainer.scrollLeft /
+                Math.max(
+                    1,
+                    chartScrollContainer.scrollWidth -
+                        chartScrollContainer.clientWidth
+                );
 
-        const newMaxScroll = chartScrollContainer.scrollWidth - chartScrollContainer.clientWidth;
-        chartScrollContainer.scrollLeft = previousScrollRatio * newMaxScroll;
-    });
+            zoomLevel -= 1;
+            updateZoomControls();
+
+            const newMaxScroll =
+                chartScrollContainer.scrollWidth -
+                chartScrollContainer.clientWidth;
+
+            chartScrollContainer.scrollLeft =
+                previousScrollRatio *
+                newMaxScroll;
+        }
+    );
 
     updateZoomControls();
     </script>`;
@@ -973,13 +1746,22 @@ function renderChartScript(chartData) {
 
 function escapeHtml(value) {
     return String(value ?? '')
-    .replaceAll('&', '&amp;')
-    .replaceAll('<', '&lt;')
-    .replaceAll('>', '&gt;')
-    .replaceAll('"', '&quot;')
-    .replaceAll("'", '&#039;');
+        .replaceAll('&', '&amp;')
+        .replaceAll('<', '&lt;')
+        .replaceAll('>', '&gt;')
+        .replaceAll('"', '&quot;')
+        .replaceAll("'", '&#039;');
 }
 
-app.listen(3001, () => {
-    console.log('Gravity Drive Calculator running at http://localhost:3001');
-});
+const PORT =
+    Number(process.env.PORT) || 3001;
+
+app.listen(
+    PORT,
+    '0.0.0.0',
+    () => {
+        console.log(
+            `Time Dilation Calculator listening on port ${PORT}`
+        );
+    }
+);
