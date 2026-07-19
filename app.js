@@ -724,7 +724,7 @@ function renderForm(
     <!DOCTYPE html>
     <html>
     <head>
-    <title>Gravity Drive Calculator</title>
+    <title>Time Dilation Calculator</title>
     <style>
     body {
         background-color: #121212;
