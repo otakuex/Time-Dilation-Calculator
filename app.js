@@ -952,7 +952,7 @@ function renderForm(
     </head>
     <body>
     <div class="container">
-    <h1>Gravity Drive Calculator</h1>
+    <h1>Time Dilation Calculator</h1>
 
     <div class="note-box">
     Distances are treated as stationary-observer distances. No length contraction is applied to the route distance. Times are rounded for storytelling use to years plus days.
