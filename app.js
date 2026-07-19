@@ -525,7 +525,7 @@ app.all('/', (req, res) => {
 
             if (accelerationGs === null) {
                 errors.push(
-                    'Gravity drive output is required and must be a positive number.'
+                    'Propulsion drive output is required and must be a positive number.'
                 );
             }
 
@@ -1080,7 +1080,7 @@ function renderForm(
 
     <div class="input-group">
     <label for="acceleration">
-    Gravity Drive Output (g):
+    Propulsion Drive Output (g):
     </label>
 
     <input
@@ -1343,7 +1343,7 @@ function renderResults(results) {
     ${speedLimitLine}
 
     <p>
-    <strong>Required Gravity Drive Output:</strong>
+    <strong>Required Propulsion Drive Output:</strong>
     ${accelerationText}
     </p>
 
